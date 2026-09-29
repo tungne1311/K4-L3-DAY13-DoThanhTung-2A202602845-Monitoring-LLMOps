@@ -65,3 +65,9 @@ def test_page_renders_six_panels_with_refresh(tmp_path: Path) -> None:
     html = dashboard.build_page(tmp_path / "missing.jsonl")
     assert html.count('class="card"') == 6
     assert 'http-equiv="refresh" content="30"' in html
+
+
+def test_zoomed_window_is_labelled(tmp_path: Path) -> None:
+    html = dashboard.build_page(tmp_path / "missing.jsonl", minutes=5)
+    assert "last 5 min" in html
+    assert "zoom" in html

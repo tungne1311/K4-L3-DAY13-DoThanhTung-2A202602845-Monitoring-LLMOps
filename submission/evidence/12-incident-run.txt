@@ -1,0 +1,40 @@
+# CP3 — chạy challenge chính thức (config/challenge.json từ release 'Challenge File' của VinUni-AI20k/K4-L3A-Day13-Monitoring-LLMOps)
+# sha256 challenge.json: b11e6286f35cde0d744adc5edcb5e0a9cdffca865eb281b2c481219b2c86f6bf
+
+$ GET /health (trước khi inject)
+{"ok":true,"tracing_enabled":true,"incidents":{"rag_slow":false,"tool_fail":false,"cost_spike":false}}
+
+$ GET /metrics (trước khi inject)
+{"traffic":0,"latency_p50":0.0,"latency_p95":0.0,"latency_p99":0.0,"ttft_p95":0.0,"avg_cost_usd":0.0,"total_cost_usd":0,"tokens_in_total":0,"tokens_out_total":0,"error_breakdown":{},"quality_avg":0.0}
+
+incident_start_utc=2026-09-29T09:17:32Z
+$ python scripts/inject_incident.py
+200 {'ok': True, 'incidents': {'rag_slow': True, 'tool_fail': False, 'cost_spike': False}}
+
+$ python scripts/load_test.py --challenge --concurrency 5
+Challenge: day13-k4-l3a-monitoring-llmops-v1 | Cohort: K4
+[200] req-2597662b | monitoring | 9471.5ms
+[200] req-54bee2d5 | monitoring | 12126.3ms
+[200] req-7a46fcde | monitoring | 12128.5ms
+[200] req-b3f5dd6c | monitoring | 12128.1ms
+[200] req-0fdf3c75 | monitoring | 14785.0ms
+load_test_end_utc=2026-09-29T09:17:47Z
+
+$ GET /metrics (sau challenge)
+{"traffic":5,"latency_p50":2653.0,"latency_p95":3867.0,"latency_p99":3867.0,"ttft_p95":51.0,"avg_cost_usd":0.0023,"total_cost_usd":0.0113,"tokens_in_total":175,"tokens_out_total":717,"error_breakdown":{},"quality_avg":0.84}
+
+# Mitigation + kiểm chứng: tắt incident theo runbook Alert 1, chạy lại cùng 5 query challenge
+mitigation_utc=2026-09-29T09:22:47Z
+$ python scripts/inject_incident.py --disable
+200 {'ok': True, 'incidents': {'rag_slow': False, 'tool_fail': False, 'cost_spike': False}}
+
+$ python scripts/load_test.py --challenge --concurrency 5
+Challenge: day13-k4-l3a-monitoring-llmops-v1 | Cohort: K4
+[200] req-20ca149c | monitoring | 2435.2ms
+[200] req-fdb853d5 | monitoring | 2435.9ms
+[200] req-cce04cd9 | monitoring | 2434.9ms
+[200] req-76dd1f31 | monitoring | 2435.3ms
+[200] req-7d833fe6 | monitoring | 2436.6ms
+recovery_end_utc=2026-09-29T09:22:50Z
+
+latency_ms feature=monitoring | incident: [3867, 2652, 2654, 2653, 2652] | sau mitigation: [1333, 151, 152, 152, 152]

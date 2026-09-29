@@ -1,0 +1,18 @@
+data/logs.jsonl, khoang su co 2026-09-29T09:17:30Z -> 2026-09-29T09:17:50Z (challenge day13-k4-l3a-monitoring-llmops-v1)
+
+ts (UTC)         event             correlation_id  feature     latency_ms  ttft_ms
+----------------------------------------------------------------------------------
+09:17:32.771     incident_enabled  req-2230e71d    -                    -        -
+09:17:33.115     request_received  req-2597662b    monitoring           -        -
+09:17:37.268     response_sent     req-2597662b    monitoring        3867       50
+09:17:37.269     request_received  req-54bee2d5    monitoring           -        -
+09:17:39.923     response_sent     req-54bee2d5    monitoring        2652       50  <== chon
+09:17:39.926     request_received  req-b3f5dd6c    monitoring           -        -
+09:17:42.581     response_sent     req-b3f5dd6c    monitoring        2654       51
+09:17:42.582     request_received  req-7a46fcde    monitoring           -        -
+09:17:45.236     response_sent     req-7a46fcde    monitoring        2653       50
+09:17:45.239     request_received  req-0fdf3c75    monitoring           -        -
+09:17:47.892     response_sent     req-0fdf3c75    monitoring        2652       50
+
+Log line day du cua req-54bee2d5 (response_sent):
+{"service": "api", "latency_ms": 2652, "ttft_ms": 50, "tokens_in": 34, "tokens_out": 111, "cost_usd": 0.001767, "quality_score": 0.9, "tool_name": "retrieval", "tool_success": true, "payload": {"answer_preview": "Starter answer. You should improve this output logic and add better quality chec..."}, "event": "response_sent", "feature": "monitoring", "correlation_id": "req-54bee2d5", "user_id_hash": "aae0b94055a9", "env": "dev", "session_id": "k4-l3a-challenge-s02", "model": "claude-sonnet-4-5", "level": "info", "ts": "2026-09-29T09:17:39.923354Z"}

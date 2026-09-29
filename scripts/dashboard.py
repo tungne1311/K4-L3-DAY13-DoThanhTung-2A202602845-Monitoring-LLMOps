@@ -2,6 +2,7 @@
 
     python scripts/dashboard.py                 # http://127.0.0.1:8050, tự refresh
     python scripts/dashboard.py --once out.html # ghi một bản HTML tĩnh
+    http://127.0.0.1:8050/?minutes=5            # zoom khi điều tra; mặc định theo contract (60)
 
 Mọi số liệu được tính lại từ log mỗi lần tải trang; tiêu đề, đơn vị, time range,
 refresh và threshold lấy từ contract để dashboard không lệch khỏi config.
@@ -16,6 +17,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
 from statistics import mean
 from typing import Any
@@ -263,9 +265,16 @@ def render_chart(
 
 
 def render_html(
-    config: dict, computed: dict, now: datetime, record_count: int, slo_latency_ms: float | None = None
+    config: dict,
+    computed: dict,
+    now: datetime,
+    record_count: int,
+    slo_latency_ms: float | None = None,
+    minutes: int | None = None,
 ) -> str:
-    minutes = config["time_range_minutes"]
+    default_minutes = config["time_range_minutes"]
+    minutes = minutes or default_minutes
+    zoom_note = "" if minutes == default_minutes else f" · <b>zoom</b> (mặc định {default_minutes} min)"
     local_now = now.astimezone()
     offset = f"{local_now:%z}"
     window = f"{local_now - timedelta(minutes=minutes):%H:%M} → {local_now:%H:%M}, UTC{offset[:3]}:{offset[3:]}"
@@ -327,7 +336,7 @@ def render_html(
 </style></head>
 <body>
 <h1>{html.escape(config["title"])}</h1>
-<div class="top">Time range: <b>last {minutes} min</b> ({window}) · auto refresh <b>{config["refresh_seconds"]}s</b>
+<div class="top">Time range: <b>last {minutes} min</b> ({window}){zoom_note} · auto refresh <b>{config["refresh_seconds"]}s</b>
  · source <b>data/logs.jsonl</b> ({record_count} records) · generated {local_now:%Y-%m-%d %H:%M:%S}</div>
 <div class="grid">
 {"".join(cards)}
@@ -335,20 +344,26 @@ def render_html(
 </body></html>"""
 
 
-def build_page(log_path: Path = LOG_PATH) -> str:
+def build_page(log_path: Path = LOG_PATH, minutes: int | None = None) -> str:
     config = load_config()
+    minutes = minutes or config["time_range_minutes"]
     now = datetime.now(timezone.utc)
-    records = load_records(log_path, now - timedelta(minutes=config["time_range_minutes"]))
-    computed = compute_panels(records, now, config["time_range_minutes"])
-    return render_html(config, computed, now, len(records), load_slo_latency_ms())
+    records = load_records(log_path, now - timedelta(minutes=minutes))
+    computed = compute_panels(records, now, minutes)
+    return render_html(config, computed, now, len(records), load_slo_latency_ms(), minutes)
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - http.server API
-        if self.path not in ("/", "/index.html"):
+        url = urlsplit(self.path)
+        if url.path not in ("/", "/index.html"):
             self.send_error(404)
             return
-        body = build_page().encode("utf-8")
+        try:
+            minutes = int(parse_qs(url.query).get("minutes", ["0"])[0])
+        except ValueError:
+            minutes = 0
+        body = build_page(minutes=max(1, min(minutes, 1440)) if minutes else None).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

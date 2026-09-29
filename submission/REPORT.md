@@ -9,7 +9,7 @@
 - **Lớp:** K4-L3A
 - **Repository URL:** https://github.com/tungne1311/K4-L3-DAY13-DoThanhTung-2A202602845-Monitoring-LLMOps
 - **Commit SHA cuối:**
-- **Challenge ID:**
+- **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1` (cohort K4, seed 1311)
 - **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602845`
 
 ## 2. Evidence index
@@ -30,9 +30,9 @@
 | Prompt versions | `evidence/09-prompt-versions.png` |
 | Prompt rollback | `evidence/10-prompt-rollback.png`, `evidence/10-prompt-rollback.txt` |
 | Dashboard runtime | `evidence/11-dashboard-overview.png` |
-| Incident metric | `evidence/12-incident-metric.png` |
-| Incident log | `evidence/13-incident-log.png` |
-| Incident trace | `evidence/14-incident-trace.png` |
+| Incident metric | `evidence/12-incident-metric.png`, `evidence/12b-incident-metric-60m.png`, `evidence/12-incident-run.txt` |
+| Incident log | `evidence/13-incident-log.png`, `evidence/13-incident-log.txt` |
+| Incident trace | `evidence/14-incident-trace.png`, `evidence/14b-incident-trace-metadata.png` |
 
 ## 3. Kết quả kỹ thuật
 
@@ -104,14 +104,27 @@
 
 ## 7. Điều tra challenge
 
-- **Challenge ID:**
-- **Khoảng thời gian điều tra:**
-- **Triệu chứng từ metrics:**
-- **Log line và correlation ID liên quan:**
-- **Trace ID và span gây ảnh hưởng:**
-- **Root cause:**
-- **Fix action:**
+- **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1`, cohort K4, seed 1311, affected feature `monitoring`, `latency_threshold_ms` 2000. File lấy từ release "Challenge File" của repo đề bài `VinUni-AI20k/K4-L3A-Day13-Monitoring-LLMOps` (sha256 `b11e6286…86f6bf`), lưu tại `config/challenge.json`, không sửa và không commit (đã `.gitignore`).
+- **Khoảng thời gian điều tra:** 2026-09-29 09:17:32Z → 09:17:48Z (16:17:32 → 16:17:48 giờ VN). Mốc: bật incident bằng `inject_incident.py` lúc 09:17:32Z, 5 request challenge từ 09:17:33Z đến 09:17:48Z, mitigation lúc 09:22:47Z (`evidence/12-incident-run.txt`).
+- **Triệu chứng từ metrics:** dashboard zoom 10 phút (`evidence/12-incident-metric.png`): panel Latency chuyển **BREACH**.
+  - P50 = 2653 ms, P95 = P99 = 3867 ms, vượt threshold P95 3000 ms và SLO 2000 ms. Baseline là P50 153 ms (`evidence/12b-incident-metric-60m.png`).
+  - TTFT P95 vẫn 51 ms. Error rate 0%, retrieval success 100%, cost 0.0113 USD và quality 0.84 đều bình thường.
+
+  Kết luận: triệu chứng là chậm, không phải lỗi hay tốn chi phí, và nằm trước bước sinh token.
+- **Log line và correlation ID liên quan:** lọc `data/logs.jsonl` trong khoảng sự cố (`evidence/13-incident-log.png`, `evidence/13-incident-log.txt`): cả 5 `response_sent` của feature `monitoring` có `latency_ms` 2652–3867, `ttft_ms` 50. Chọn `req-54bee2d5`:
+  `{"event": "response_sent", "correlation_id": "req-54bee2d5", "feature": "monitoring", "latency_ms": 2652, "ttft_ms": 50, "tool_name": "retrieval", "tool_success": true, "session_id": "k4-l3a-challenge-s02", "ts": "2026-09-29T09:17:39.923354Z", ...}`
+- **Trace ID và span gây ảnh hưởng:** trace `2329bdf58878acca2642e46caf0b3455` có metadata `correlation_id = req-54bee2d5` (`evidence/14b-incident-trace-metadata.png`). Timeline (`evidence/14-incident-trace.png`):
+  - `lab-agent-run` 2.65 s, trong đó **`retrieve` 2.50 s (≈ 94%)**.
+  - `resolve-prompt` 1 ms, `llm-generate` 151 ms (TTFT 0.05 s).
+  - Trace baseline cùng cấu trúc (`6ea28b95250f1c15c1d30fbbe094809e`) có `retrieve` ≈ 0 ms.
+  - Cả 5 trace challenge đều có `retrieve` ≈ 2.50 s. Riêng `req-2597662b` (trace `e3820ea502e49a6e69a83e42f1e089f3`, 3867 ms) cộng thêm 1.2 s ở `resolve-prompt`, do cold prompt fetch khi request đầu tiên sau khi API reload phải lấy prompt từ Langfuse. Đây là yếu tố phụ, không phải root cause.
+- **Root cause:** incident `rag_slow` làm bước retrieval (vector store, `app/mock_rag.py`) chậm thêm ≈ 2.5 s mỗi request. Retrieval chạy tuần tự trước khi gọi LLM nên toàn bộ độ trễ cộng thẳng vào latency, trong khi LLM và prompt không đổi. Metric (P50/P95 tăng, TTFT và error bình thường), log (`latency_ms` 2652 nhưng `ttft_ms` 50) và trace (`retrieve` 2.50 s / 2.65 s) cùng chỉ về một span. Thêm nữa, endpoint `async def /chat` gọi agent đồng bộ nên các request đồng thời bị xếp hàng: client của request cuối phải chờ 14.8 s dù server chỉ đo 2.65 s.
+- **Fix action:** theo runbook Alert 1, gỡ nguồn chậm bằng `python scripts/inject_incident.py --disable` (tương đương khôi phục vector store / chuyển sang index dự phòng). Kiểm chứng bằng cách chạy lại đúng 5 query challenge: `latency_ms` giảm từ [3867, 2652, 2654, 2653, 2652] xuống [1333, 151, 152, 152, 152]. Request 1333 ms là cold prompt fetch, `retrieve` về ≈ 0 ms (`evidence/12-incident-run.txt`).
 - **Preventive measure:**
+  1. Đặt timeout ~500 ms cho retrieval kèm fallback (cache kết quả gần nhất hoặc trả lời "không có tài liệu") để vector store chậm không kéo cả request quá SLO.
+  2. Chạy agent đồng bộ bằng `run_in_threadpool` (hoặc đổi endpoint thành `def`) để một request chậm không chặn event loop và các request khác.
+  3. Thêm alert riêng cho span `retrieve` (P95 duration > 500 ms trong 5 phút) bên cạnh `HighLatencyP95`, vì alert tổng cần 5 phút mới bắn còn sự cố challenge chỉ kéo dài 16 s.
+  4. Warm-up prompt khi API khởi động và tăng `cache_ttl_seconds` để loại cold prompt fetch 1.2 s khỏi tail latency.
 
 ## 8. Giải thích và tự đánh giá
 
