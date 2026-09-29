@@ -8,7 +8,7 @@
 - **MSSV:** 2A202602845
 - **Lớp:** K4-L3A
 - **Repository URL:** https://github.com/tungne1311/K4-L3-DAY13-DoThanhTung-2A202602845-Monitoring-LLMOps
-- **Commit SHA cuối:**
+- **Commit SHA cuối:** commit cuối của nhánh `main`, nộp kèm URL repo trên LMS
 - **Challenge ID:** `day13-k4-l3a-monitoring-llmops-v1` (cohort K4, seed 1311)
 - **Tên project Langfuse cá nhân:** `day13-k4-l3a-2A202602845`
 
@@ -38,13 +38,13 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | 30/100 — 22 records, 20 thiếu required fields, 20 thiếu enrichment, 0 correlation ID | | Baseline chưa làm TODO CP1; PII "passed" chỉ vì log chưa ghi PII thô |
-| `validate_dashboard.py` | 6/6 panel có trong contract | | Validator chỉ kiểm contract, chưa có dashboard runtime |
-| `pytest` | 22 passed | | |
-| Số traces hợp lệ | 10 traces `day13-agent-request`, chỉ có root `lab-agent-run` | | Chưa có child retrieval/generation; `prompt_source=local-fallback` vì chưa tạo prompt `day13-chat` |
-| Số PII leak | 0 | | |
-| Latency P95 / TTFT P95 | 2825 ms / 50 ms (P50 672 ms, P99 2825 ms) | | Chỉ 10 request nên P95 = P99 = request chậm nhất |
-| Retrieval success rate | 100% (10/10) | | |
+| `validate_logs.py` | 30/100 — 22 records, 20 thiếu required fields, 20 thiếu enrichment, 0 correlation ID | 100/100 — 0 thiếu field, 0 thiếu enrichment, 0 PII leak | Baseline chưa làm TODO CP1; PII "passed" chỉ vì log chưa ghi PII thô |
+| `validate_dashboard.py` | 6/6 panel có trong contract | 6/6 + dashboard runtime `scripts/dashboard.py` | Validator chỉ kiểm contract; runtime ở `evidence/11-dashboard-overview.png` |
+| `pytest` | 22 passed | 38 passed | Thêm test PII, correlation ID, child observations, dashboard |
+| Số traces hợp lệ | 10 traces `day13-agent-request`, chỉ có root `lab-agent-run` | 46 traces có root + retrieve + generation (67 traces tổng) | Baseline chưa có child và dùng `local-fallback`; cuối cùng prompt lấy từ Langfuse |
+| Số PII leak | 0 | 0 (log và trace) | Đã thử email, SĐT, thẻ, CCCD, passport giả |
+| Latency P95 / TTFT P95 | 2825 ms / 50 ms (P50 672 ms, P99 2825 ms) | Bình thường: P50 152 ms, TTFT P95 51 ms; lúc incident P95 3867 ms | P95 sau fix 1333 ms là 1 request cold prompt fetch trong 5 request |
+| Retrieval success rate | 100% (10/10) | 100% | Challenge `rag_slow` làm retrieval chậm chứ không lỗi |
 
 ## 4. Logging và PII
 
@@ -55,7 +55,7 @@
 
 ## 5. Tracing và prompt versioning
 
-- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** key trong `.env` thuộc project cá nhân `day13-k4-l3a-2A202602845` (project id `cmumdhy8720jiad0c945kvqcu`). Traces được sinh từ `load_test.py --concurrency 5` và các request prompt chạy trên máy tôi. Mỗi trace có `correlation_id` trùng với một dòng log trong `data/logs.jsonl` của tôi. 36 traces có đủ root + retrieval + generation (`evidence/06-trace-list.txt`, `evidence/06-trace-list.png`).
+- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** key trong `.env` thuộc project cá nhân `day13-k4-l3a-2A202602845` (project id `cmumdhy8720jiad0c945kvqcu`). Traces được sinh từ `load_test.py --concurrency 5` và các request prompt chạy trên máy mình. Mỗi trace có `correlation_id` trùng với một dòng log trong `data/logs.jsonl` của mình. 36 traces có đủ root + retrieval + generation (`evidence/06-trace-list.txt`, `evidence/06-trace-list.png`).
 - **Cấu trúc root/retrieval/generation observations:** root `lab-agent-run` (AGENT, `@observe`, không capture input/output thô) có 3 con tạo bằng `start_as_current_observation` của SDK v4 (`app/agent.py`, `app/tracing.py`):
   - `retrieve` (RETRIEVER): input là query preview đã scrub, output là số lượng và nội dung docs; khi vector store lỗi thì level ERROR kèm `status_message`.
   - `resolve-prompt` (SPAN): thời gian lấy prompt từ Langfuse, output gồm name/label/version/source; level WARNING nếu phải fallback.
@@ -88,7 +88,7 @@
   6. Quality: mean `quality_score`, threshold ≥ 0.75.
 
   Mỗi panel có badge OK/BREACH so với threshold. `validate_dashboard.py` = 6/6 (`evidence/03-dashboard-validator.*`). Test: `tests/test_dashboard_runtime.py` (`evidence/11-dashboard-overview.png`).
-- **SLO và lý do chọn:** `fast_successful_requests`: 99.5% request (mẫu số `request_received`) trả `response_sent` trong ≤ 2000 ms, cửa sổ 28 ngày (`config/slo.yaml`). Tôi hạ ngưỡng từ 3000 ms xuống 2000 ms dựa trên số đo:
+- **SLO và lý do chọn:** `fast_successful_requests`: 99.5% request (mẫu số `request_received`) trả `response_sent` trong ≤ 2000 ms, cửa sổ 28 ngày (`config/slo.yaml`). Mình hạ ngưỡng từ 3000 ms xuống 2000 ms dựa trên số đo:
   - Warm P50 ≈ 152 ms, P95 ≈ 153 ms.
   - Cold prompt fetch khi cache prompt hết hạn: 1.2–1.9 s.
   - Chạy thử `rag_slow` trên server tách riêng: 2653 ms, nên ngưỡng 3000 ms cũ không bắt được sự cố retrieval chậm.
@@ -128,20 +128,20 @@
 
 ## 8. Giải thích và tự đánh giá
 
-- **Một quyết định kỹ thuật quan trọng và lý do:**
-- **Một lỗi/blocker đã gặp:**
-- **Cách tìm nguyên nhân và xử lý:**
-- **Cách hiểu luồng Metrics → Logs → Traces:**
-- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:**
-- **Điều quan trọng nhất đã học:**
-- **Hạn chế hoặc phần chưa hoàn thành, nếu có:**
+- **Một quyết định kỹ thuật quan trọng và lý do:** Mình hạ ngưỡng SLO latency từ 3000 xuống 2000 ms. Lúc đầu mình định giữ 3000 ms cho khớp dashboard, nhưng chạy thử `rag_slow` trên một server riêng thì request chỉ mất khoảng 2650 ms. Với ngưỡng cũ, SLO sẽ không bao giờ báo động cho đúng loại sự cố mà lab muốn mình bắt. 2000 ms vẫn cao hơn lần lấy prompt chậm nhất (khoảng 1.9 s) nên không báo nhầm lúc bình thường. Threshold 3000 ms của dashboard là contract nên mình giữ nguyên và chỉ vẽ thêm đường SLO.
+- **Một lỗi/blocker đã gặp:** Chạy chuỗi prompt baseline/candidate/promote/rollback lần đầu thì 4 trên 5 trace không xuất hiện trên Langfuse, dù request trả 200 và log vẫn ghi đủ.
+- **Cách tìm nguyên nhân và xử lý:** Tra bằng API theo `correlation_id` thì thấy đúng những trace của server bị tắt sớm là mất. Đọc tài liệu SDK mới biết span được gom lại và khoảng 5 giây mới gửi một lần, còn script của mình tắt server sau 3 giây. Mình thêm `flush()` lúc app tắt, rồi khi chạy lại thì chờ đến khi trace thật sự có trên Langfuse mới dừng server. Trong lúc đó còn gặp thêm hai lỗi nhỏ: không được gán tay label `latest`, và API `/traces` cũ bị khóa với org mới nên phải chuyển sang API v2 observations.
+- **Cách hiểu luồng Metrics → Logs → Traces:** Metrics cho biết có chuyện và xảy ra lúc nào. Ở CP3, P50 nhảy từ 153 lên 2653 ms nhưng TTFT, error và cost vẫn bình thường, nên mình biết là chậm chứ không phải lỗi, và chậm trước bước LLM. Logs thu hẹp xuống từng request: lọc đúng khoảng thời gian đó thì cả 5 request `monitoring` đều khoảng 2650 ms, và mình lấy được `req-54bee2d5`. Trace của đúng ID đó cho biết thời gian nằm ở đâu: `retrieve` chiếm 2.50 trên 2.65 s. Thiếu một trong ba lớp thì chỉ đoán được: có metric mà không có trace thì không biết span nào chậm, có trace mà không có metric thì không biết đó là sự cố hay chỉ là một request lẻ.
+- **Vai trò của prompt version, token/cost, SLO hoặc rollback trong vận hành LLM:** Với LLM, đổi prompt cũng giống như deploy code mới, nên phải biết mỗi request đang dùng version nào. Nhờ `prompt_version` trong trace mình thấy ngay v2 làm input tăng từ 32 lên 49 token, tức chi phí đầu vào tăng khoảng 50%. Rollback bằng label cho phép quay về v1 trong vài giây mà không phải deploy lại. SLO và error budget biến câu hỏi "có nên đổi tiếp không" thành một con số: còn budget thì thử qua `candidate`, hết budget thì dừng và rollback `production`.
+- **Điều quan trọng nhất đã học:** Observability phải được thiết kế từ trước. Nếu ngay từ đầu không gắn `correlation_id` vào cả log lẫn trace và không tách span retrieval, thì lúc có sự cố mình sẽ chỉ biết "API chậm" mà không chỉ ra được chậm ở đâu.
+- **Hạn chế hoặc phần chưa hoàn thành, nếu có:** Dashboard là script tự viết đọc file log, chưa phải Grafana hay công cụ có alert thật. Alert mới dừng ở mức YAML và runbook, chưa nối Slack thật, và với duration 5 phút thì sự cố challenge dài 16 s sẽ không kích hoạt alert. Endpoint `async` gọi code đồng bộ nên các request đồng thời xếp hàng (client chờ tới 14.8 s trong khi server đo 2.65 s). Mình đã ghi nhận và đề xuất `run_in_threadpool` nhưng chưa sửa, để không làm lệch kết quả challenge.
 
 ## 9. Checklist trước khi nộp
 
-- [ ] Kết quả và evidence thuộc commit SHA cuối.
-- [ ] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
-- [ ] Incident evidence nối đúng metric → log → trace.
-- [ ] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
-- [ ] Repository chạy lại được theo README.
-- [ ] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
+- [x] Kết quả và evidence thuộc commit SHA cuối.
+- [x] Tất cả ảnh/output mở được bằng đường dẫn tương đối.
+- [x] Incident evidence nối đúng metric → log → trace.
+- [x] Trace/prompt evidence thuộc project Langfuse cá nhân và ảnh không lộ key/secret.
+- [x] Repository chạy lại được theo README.
+- [x] Không có secret, API key, PII thô hoặc evidence của người khác/lớp khác.
 - [ ] URL repo và commit SHA cuối đã được nộp trên LMS/Codelabs.
