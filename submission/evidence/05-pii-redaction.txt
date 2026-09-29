@@ -5,9 +5,11 @@
 {"service": "api", "payload": {"message_preview": "What is the policy for PII and credit card [REDACTED_CREDIT_CARD]?"}, "event": "request_received", "session_id": "s09", "user_id_hash": "4d14d5d4f719", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-d7bfb913", "level": "info", "ts": "2026-09-29T08:07:11.579710Z"}
 {"service": "api", "payload": {"message_preview": "CCCD [REDACTED_CCCD], passport [REDACTED_PASSPORT]"}, "event": "request_received", "session_id": "s99", "user_id_hash": "a2ca3270b849", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-0000beef", "level": "info", "ts": "2026-09-29T08:07:12.795949Z"}
 
-# Kiểm tra không còn PII thô:
-student@vinuni.edu.vn  -> 0 lần
-0987654321             -> 0 lần
-4111 1111 1111 1111    -> 0 lần
-001203004567           -> 0 lần
-B1234567               -> 0 lần
+# Kiểm tra không còn PII thô: grep 5 giá trị PII giả dùng trong input (email, SĐT, thẻ,
+# CCCD, hộ chiếu của data/sample_queries.jsonl và request thử) trên data/logs.jsonl -> mỗi giá trị 0 lần.
+# Không in lại giá trị gốc ở đây để evidence không chứa PII nguyên văn.
+email       -> 0 lần
+phone_vn    -> 0 lần
+credit_card -> 0 lần
+cccd        -> 0 lần
+passport    -> 0 lần
