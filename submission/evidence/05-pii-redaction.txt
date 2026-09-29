@@ -1,0 +1,13 @@
+# CP1 — PII redaction: input chứa email / SĐT / thẻ / CCCD / passport giả, log chỉ còn placeholder
+
+{"service": "api", "payload": {"message_preview": "What is your refund policy? My email is [REDACTED_EMAIL]"}, "event": "request_received", "session_id": "s01", "user_id_hash": "2055254ee30a", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-e9d3d0a8", "level": "info", "ts": "2026-09-29T08:07:05.837415Z"}
+{"service": "api", "payload": {"message_preview": "Here is my phone [REDACTED_PHONE_VN], what should be logged?"}, "event": "request_received", "session_id": "s05", "user_id_hash": "64f6ec689229", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-a7546950", "level": "info", "ts": "2026-09-29T08:07:09.860924Z"}
+{"service": "api", "payload": {"message_preview": "What is the policy for PII and credit card [REDACTED_CREDIT_CARD]?"}, "event": "request_received", "session_id": "s09", "user_id_hash": "4d14d5d4f719", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-d7bfb913", "level": "info", "ts": "2026-09-29T08:07:11.579710Z"}
+{"service": "api", "payload": {"message_preview": "CCCD [REDACTED_CCCD], passport [REDACTED_PASSPORT]"}, "event": "request_received", "session_id": "s99", "user_id_hash": "a2ca3270b849", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-0000beef", "level": "info", "ts": "2026-09-29T08:07:12.795949Z"}
+
+# Kiểm tra không còn PII thô:
+student@vinuni.edu.vn  -> 0 lần
+0987654321             -> 0 lần
+4111 1111 1111 1111    -> 0 lần
+001203004567           -> 0 lần
+B1234567               -> 0 lần

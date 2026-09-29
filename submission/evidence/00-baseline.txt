@@ -1,0 +1,27 @@
+# CP0 baseline — 2026-09-29 (trước khi làm TODO CP1)
+
+$ python scripts/validate_logs.py
+--- Lab Verification Results ---
+Total log records analyzed: 22
+Records with missing required fields: 20
+Records with missing enrichment (context): 20
+Unique correlation IDs found: 0
+Potential PII leaks detected: 0
+
+--- Grading Scorecard (Estimates) ---
+- [FAILED] Missing required fields (ts, level, etc.)
+- [FAILED] Correlation ID propagation (less than 2 unique IDs)
+- [FAILED] Log enrichment (missing user_id_hash, etc.)
++ [PASSED] PII scrubbing
+
+Estimated Score: 30/100
+
+$ python scripts/validate_dashboard.py
+HỢP LỆ: 6/6 panel có trong dashboard contract.
+
+$ python -m pytest -q
+......................                                                   [100%]
+22 passed in 2.03s
+
+$ GET /metrics
+{"traffic":10,"latency_p50":672.0,"latency_p95":2825.0,"latency_p99":2825.0,"ttft_p95":50.0,"avg_cost_usd":0.002,"total_cost_usd":0.0199,"tokens_in_total":338,"tokens_out_total":1262,"error_breakdown":{},"quality_avg":0.88}

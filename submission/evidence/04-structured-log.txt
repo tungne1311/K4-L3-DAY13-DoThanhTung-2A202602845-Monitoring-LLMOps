@@ -1,0 +1,4 @@
+# CP1 — structured log mẫu (data/logs.jsonl): request_received + response_sent của cùng một correlation_id
+
+{"service": "api", "payload": {"message_preview": "What is your refund policy? My email is [REDACTED_EMAIL]"}, "event": "request_received", "session_id": "s01", "user_id_hash": "2055254ee30a", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-e9d3d0a8", "level": "info", "ts": "2026-09-29T08:07:05.837415Z"}
+{"service": "api", "latency_ms": 1617, "ttft_ms": 61, "tokens_in": 36, "tokens_out": 107, "cost_usd": 0.001713, "quality_score": 0.9, "tool_name": "retrieval", "tool_success": true, "payload": {"answer_preview": "Starter answer. You should improve this output logic and add better quality chec..."}, "event": "response_sent", "session_id": "s01", "user_id_hash": "2055254ee30a", "model": "claude-sonnet-4-5", "env": "dev", "feature": "qa", "correlation_id": "req-e9d3d0a8", "level": "info", "ts": "2026-09-29T08:07:08.264214Z"}
