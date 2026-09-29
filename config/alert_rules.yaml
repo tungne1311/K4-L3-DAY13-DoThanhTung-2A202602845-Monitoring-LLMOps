@@ -1,25 +1,33 @@
 alerts:
-  - name: TODO_alert_1
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: HighLatencyP95
+    severity: P2-warning
+    condition: 'p95(latency_ms) over event == "response_sent" > 2000 ms'
+    duration: 5m
     type: symptom-based
+    slo: fast_successful_requests
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-k4-l3a-alerts'
+    owner: Đỗ Thanh Tùng (on-call)
     runbook: docs/alerts.md#alert-1
-  - name: TODO_alert_2
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: HighErrorRate
+    severity: P1-critical
+    condition: >-
+      count(event == "request_failed") / count(event == "request_received") * 100 > 2
+      OR tool_success_rate_pct < 90
+    duration: 5m
     type: symptom-based
+    slo: fast_successful_requests
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-k4-l3a-alerts'
+    owner: Đỗ Thanh Tùng (on-call)
     runbook: docs/alerts.md#alert-2
-  - name: TODO_alert_3
-    severity: TODO
-    condition: TODO
-    duration: TODO
+  - name: CostPerRequestSpike
+    severity: P3-warning
+    condition: 'avg(cost_usd) over event == "response_sent" > 0.004 USD'
+    duration: 15m
     type: symptom-based
+    slo: guardrail daily_cost_usd_max = 2.5
     channel: slack
-    owner: TODO
+    slack_channel: '#day13-k4-l3a-alerts'
+    owner: Đỗ Thanh Tùng (on-call)
     runbook: docs/alerts.md#alert-3

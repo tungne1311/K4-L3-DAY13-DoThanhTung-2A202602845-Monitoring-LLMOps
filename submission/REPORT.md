@@ -21,14 +21,14 @@
 | Baseline CP0 (validators, pytest, metrics) | `evidence/00-baseline.txt` |
 | Pytest cuối | `evidence/01-pytest.png` |
 | Log validator | `evidence/02-log-validator.png`, `evidence/02-log-validator.txt` |
-| Dashboard validator | `evidence/03-dashboard-validator.png` |
+| Dashboard validator | `evidence/03-dashboard-validator.png`, `evidence/03-dashboard-validator.txt` |
 | Structured log | `evidence/04-structured-log.png`, `evidence/04-structured-log.txt` |
 | PII redaction | `evidence/05-pii-redaction.png`, `evidence/05-pii-redaction.txt` |
-| Trace list | `evidence/06-trace-list.png` |
+| Trace list | `evidence/06-trace-list.png`, `evidence/06-trace-list.txt` |
 | Trace waterfall | `evidence/07-trace-waterfall.png` |
 | Trace metadata | `evidence/08-trace-metadata.png` |
 | Prompt versions | `evidence/09-prompt-versions.png` |
-| Prompt rollback | `evidence/10-prompt-rollback.png` |
+| Prompt rollback | `evidence/10-prompt-rollback.png`, `evidence/10-prompt-rollback.txt` |
 | Dashboard runtime | `evidence/11-dashboard-overview.png` |
 | Incident metric | `evidence/12-incident-metric.png` |
 | Incident log | `evidence/13-incident-log.png` |
@@ -55,21 +55,52 @@
 
 ## 5. Tracing và prompt versioning
 
-- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:**
-- **Cấu trúc root/retrieval/generation observations:**
-- **Cách nối trace với log:**
-- **Prompt name:**
-- **Version/label baseline:**
-- **Version/label candidate:**
-- **Trace ID của mỗi version:**
-- **Cách promote và rollback `production`:**
+- **Cách xác nhận traces do chính tôi tạo trong project cá nhân:** key trong `.env` thuộc project cá nhân `day13-k4-l3a-2A202602845` (project id `cmumdhy8720jiad0c945kvqcu`). Traces được sinh từ `load_test.py --concurrency 5` và các request prompt chạy trên máy tôi. Mỗi trace có `correlation_id` trùng với một dòng log trong `data/logs.jsonl` của tôi. 36 traces có đủ root + retrieval + generation (`evidence/06-trace-list.txt`, `evidence/06-trace-list.png`).
+- **Cấu trúc root/retrieval/generation observations:** root `lab-agent-run` (AGENT, `@observe`, không capture input/output thô) có 3 con tạo bằng `start_as_current_observation` của SDK v4 (`app/agent.py`, `app/tracing.py`):
+  - `retrieve` (RETRIEVER): input là query preview đã scrub, output là số lượng và nội dung docs; khi vector store lỗi thì level ERROR kèm `status_message`.
+  - `resolve-prompt` (SPAN): thời gian lấy prompt từ Langfuse, output gồm name/label/version/source; level WARNING nếu phải fallback.
+  - `llm-generate` (GENERATION): `model=claude-sonnet-4-5`, input là prompt đã scrub PII, link tới prompt managed, `usage_details` input/output, `cost_details` input/output/total, `completion_start_time` để Langfuse tính TTFT.
+  - Ví dụ trace `6ea28b95250f1c15c1d30fbbe094809e` (`req-a25aae7a`): generation 36 input / 180 output tokens, cost 0.002808 USD, TTFT 0.05 s (`evidence/07-trace-waterfall.png`).
+- **Cách nối trace với log:** middleware sinh `correlation_id` (`x-request-id`) → được bind vào mọi log line và truyền vào `LabAgent.run`, nơi `propagate_attributes(metadata={"correlation_id": ...})` gắn nó vào mọi observation của trace. Trên Langfuse lọc Metadata `correlation_id = req-...` để mở đúng trace của một dòng log (`evidence/08-trace-metadata.png`). Trace còn có `user_id` (hash), `session_id`, tags `lab/<feature>/<model>`.
+- **Prompt name:** `day13-chat` (text prompt, giữ 3 biến `{{feature}}`, `{{docs}}`, `{{message}}`).
+- **Version/label baseline:** v1, labels `baseline` + `production`, template `Feature=…\nDocs=…\nQuestion=…`.
+- **Version/label candidate:** v2, label `candidate`, thêm dòng "Answer in at most 3 short bullet points, using only the docs above." (thay đổi nhỏ về format/độ dài câu trả lời).
+- **Trace ID của mỗi version:** cùng input "Explain why metrics traces and logs work together" (`evidence/10-prompt-rollback.txt`):
+
+  | Bước | correlation_id | Trace ID | label → version | tokens_in |
+  |---|---|---|---|---|
+  | label baseline | `req-0001b001` | `db3aa40443dc125e339d8778000e26a6` | baseline → v1 | 32 |
+  | label candidate | `req-0001c002` | `886c8be6274dca5c70c7193da247e3ea` | candidate → v2 | 49 |
+  | production trước promote | `req-0001a003` | `dede46ae82f45aa456a6acad8ff30bf7` | production → v1 | 32 |
+  | production sau promote v2 | `req-0001d004` | `5d089acb2aa4dc80111e00925ba0d861` | production → v2 | 49 |
+  | production sau rollback | `req-0001e005` | `95c3af2ddd02b5a86e1ae9f08d94dc77` | production → v1 | 32 |
+
+- **Cách promote và rollback `production`:** `python scripts/manage_prompt.py promote --version 2` gọi `update_prompt(new_labels=[..., "production"])` cho v2. Label là duy nhất giữa các version nên Langfuse tự gỡ `production` khỏi v1. Rollback bằng `promote --version 1`. App đọc label qua `LANGFUSE_PROMPT_LABEL` và cache prompt 60 s, nên restart API hoặc chờ hết TTL rồi request tiếp theo sẽ dùng version mới. Không cần deploy lại code. Bằng chứng: `status` trước/sau mỗi bước và trace production v1 → v2 → v1 ở bảng trên (`evidence/09-prompt-versions.png`, `evidence/10-prompt-rollback.png`, `evidence/10-prompt-rollback.txt`).
 
 ## 6. Dashboard, SLO và alerts
 
-- **Dashboard và sáu panel:**
-- **SLO và lý do chọn:**
-- **Cách tính error budget:**
-- **Ba alert và runbook tương ứng:**
+- **Dashboard và sáu panel:** `python scripts/dashboard.py` → <http://127.0.0.1:8050>. Script không cần thư viện mới, tính lại mọi số từ `data/logs.jsonl` mỗi lần tải trang. Tiêu đề, đơn vị, time range 60 phút, refresh 30 s và threshold đều đọc từ `config/dashboard.yaml`. Sáu panel:
+  1. Latency: P50/P95/P99 và TTFT P95, threshold P95 ≤ 3000 ms, thêm đường SLO 2000 ms.
+  2. Traffic: count và request/phút, threshold ≥ 1.
+  3. Errors: error rate, `count_by(error_type)` và retrieval success (`tool_success`), threshold ≤ 2%.
+  4. Cost: USD theo phút và tổng, threshold ≤ 2.5 USD.
+  5. Tokens: tổng input/output, threshold ≤ 50000.
+  6. Quality: mean `quality_score`, threshold ≥ 0.75.
+
+  Mỗi panel có badge OK/BREACH so với threshold. `validate_dashboard.py` = 6/6 (`evidence/03-dashboard-validator.*`). Test: `tests/test_dashboard_runtime.py` (`evidence/11-dashboard-overview.png`).
+- **SLO và lý do chọn:** `fast_successful_requests`: 99.5% request (mẫu số `request_received`) trả `response_sent` trong ≤ 2000 ms, cửa sổ 28 ngày (`config/slo.yaml`). Tôi hạ ngưỡng từ 3000 ms xuống 2000 ms dựa trên số đo:
+  - Warm P50 ≈ 152 ms, P95 ≈ 153 ms.
+  - Cold prompt fetch khi cache prompt hết hạn: 1.2–1.9 s.
+  - Chạy thử `rag_slow` trên server tách riêng: 2653 ms, nên ngưỡng 3000 ms cũ không bắt được sự cố retrieval chậm.
+
+  Target 99.5% vì dịch vụ phụ thuộc Langfuse Cloud và vector store bên ngoài.
+- **Cách tính error budget:** budget = 100% − 99.5% = 0.5% số request, tức `allowed_bad = 0.005 × total`. Ví dụ 10,000 request / 28 ngày → 50 request được phép chậm hoặc lỗi (≈ 1.8/ngày). Burn rate = tỷ lệ request xấu / 0.5%. Error rate 2% (guardrail) = burn rate 4, hết budget sau 7 ngày. 7.2% = burn rate 14.4, tiêu 2% budget mỗi giờ nên cần page ngay. Chính sách khi dùng quá 50% hoặc hết budget: thay đổi prompt/model phải qua `candidate`, rồi rollback `production`.
+- **Ba alert và runbook tương ứng:** `config/alert_rules.yaml` + `docs/alerts.md`. Cả ba đều symptom-based, gửi Slack `#day13-k4-l3a-alerts`, owner Đỗ Thanh Tùng (on-call):
+  1. `HighLatencyP95` (P2, 5m): P95 latency > 2000 ms → [runbook](../docs/alerts.md#alert-1).
+  2. `HighErrorRate` (P1, 5m): error rate > 2% hoặc retrieval success < 90% → [runbook](../docs/alerts.md#alert-2).
+  3. `CostPerRequestSpike` (P3, 15m): avg cost > 0.004 USD/request, tức ≈ 2× baseline 0.0019. Chạy thử `cost_spike` cho 0.0058–0.0107 USD → [runbook](../docs/alerts.md#alert-3).
+
+  Mỗi runbook có ảnh hưởng người dùng, 3 bước kiểm tra theo Metrics → Logs → Traces và mitigation.
 
 ## 7. Điều tra challenge
 

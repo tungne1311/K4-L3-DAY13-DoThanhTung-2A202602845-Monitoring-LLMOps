@@ -3,13 +3,20 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from . import metrics
-from .mock_llm import FakeLLM
+from .mock_llm import FakeLLM, FakeResponse
 from .mock_rag import retrieve
-from .pii import hash_user_id, summarize_text
-from .prompt_management import resolve_prompt
-from .tracing import get_langfuse_client, observe, propagate_attributes, tracing_enabled
+from .pii import hash_user_id, scrub_text, summarize_text
+from .prompt_management import ResolvedPrompt, resolve_prompt
+from .tracing import (
+    get_langfuse_client,
+    observe,
+    propagate_attributes,
+    start_observation,
+    tracing_enabled,
+)
 
 
 @dataclass
@@ -51,14 +58,25 @@ class LabAgent:
             },
         ):
             started = time.perf_counter()
-            docs = retrieve(message)
-            prompt = resolve_prompt(
-                langfuse_client,
-                feature=feature,
-                docs=docs,
-                message=message,
-                enabled=tracing_enabled(),
-            )
+            docs = self._retrieve(message)
+            with start_observation(name="resolve-prompt", as_type="span") as prompt_span:
+                prompt = resolve_prompt(
+                    langfuse_client,
+                    feature=feature,
+                    docs=docs,
+                    message=message,
+                    enabled=tracing_enabled(),
+                )
+                prompt_span.update(
+                    output={
+                        "prompt_name": prompt.name,
+                        "prompt_label": prompt.label,
+                        "prompt_version": prompt.version,
+                        "prompt_source": prompt.source,
+                    },
+                    level="WARNING" if prompt.fetch_error else None,
+                    status_message=prompt.fetch_error,
+                )
             langfuse_client.update_current_span(
                 metadata={
                     "doc_count": len(docs),
@@ -71,13 +89,10 @@ class LabAgent:
                 },
                 version=prompt.version,
             )
-            # TODO (CP2): instrument retrieve() and FakeLLM.generate() as child
-            # observations. The nested generation must receive prompt, usage and cost.
             with propagate_attributes(prompt=prompt.managed_prompt):
-                response = self.llm.generate(prompt.text)
+                response, cost_usd = self._generate(prompt)
             quality_score = self._heuristic_quality(message, response.text, docs)
             latency_ms = int((time.perf_counter() - started) * 1000)
-            cost_usd = self._estimate_cost(response.usage.input_tokens, response.usage.output_tokens)
 
         metrics.record_request(
             latency_ms=latency_ms,
@@ -98,10 +113,60 @@ class LabAgent:
             quality_score=quality_score,
         )
 
-    def _estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
+    def _retrieve(self, message: str) -> list[str]:
+        """Child observation for the vector-store lookup; only a scrubbed query preview is sent."""
+        with start_observation(
+            name="retrieve",
+            as_type="retriever",
+            input={"query_preview": summarize_text(message)},
+        ) as observation:
+            try:
+                docs = retrieve(message)
+            except Exception as exc:
+                observation.update(level="ERROR", status_message=f"{type(exc).__name__}: {exc}")
+                raise
+            observation.update(output={"doc_count": len(docs), "docs": docs})
+            return docs
+
+    def _generate(self, prompt: ResolvedPrompt) -> tuple[FakeResponse, float]:
+        """Child generation linked to the managed prompt, with usage, cost and TTFT."""
+        with start_observation(
+            name="llm-generate",
+            as_type="generation",
+            model=self.model,
+            input=scrub_text(prompt.text),
+            prompt=prompt.managed_prompt,
+            metadata={
+                "prompt_name": prompt.name,
+                "prompt_label": prompt.label,
+                "prompt_version": prompt.version,
+                "prompt_source": prompt.source,
+            },
+        ) as generation:
+            call_started = datetime.now(timezone.utc)
+            response = self.llm.generate(prompt.text)
+            input_cost, output_cost = self._cost_breakdown(
+                response.usage.input_tokens, response.usage.output_tokens
+            )
+            cost_usd = round(input_cost + output_cost, 6)
+            generation.update(
+                output=summarize_text(response.text, max_len=200),
+                completion_start_time=call_started + timedelta(milliseconds=response.ttft_ms),
+                usage_details={
+                    "input": response.usage.input_tokens,
+                    "output": response.usage.output_tokens,
+                },
+                cost_details={"input": input_cost, "output": output_cost, "total": cost_usd},
+            )
+            return response, cost_usd
+
+    def _cost_breakdown(self, tokens_in: int, tokens_out: int) -> tuple[float, float]:
         input_cost = (tokens_in / 1_000_000) * 3
         output_cost = (tokens_out / 1_000_000) * 15
-        return round(input_cost + output_cost, 6)
+        return round(input_cost, 6), round(output_cost, 6)
+
+    def _estimate_cost(self, tokens_in: int, tokens_out: int) -> float:
+        return round(sum(self._cost_breakdown(tokens_in, tokens_out)), 6)
 
     def _heuristic_quality(self, question: str, answer: str, docs: list[str]) -> float:
         score = 0.5

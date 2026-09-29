@@ -1,0 +1,33 @@
+# CP2 — prompt versioning: cùng input, khác label, promote và rollback (2026-09-29)
+# Mỗi dòng [n] là một request thật tới /chat; tokens_in khác nhau vì v2 dài hơn v1.
+
+$ python scripts/manage_prompt.py status
+Prompt 'day13-chat':
+  v1: labels=[baseline, production]  last line: 'Question={{message}}'
+  v2: labels=[candidate, latest]  last line: 'Answer in at most 3 short bullet points, using only the docs above.'
+
+[1. label baseline] LANGFUSE_PROMPT_LABEL=baseline x-request-id=req-0001b001 -> correlation_id=req-0001b001 tokens_in=32
+[2. label candidate] LANGFUSE_PROMPT_LABEL=candidate x-request-id=req-0001c002 -> correlation_id=req-0001c002 tokens_in=49
+[3. production truoc khi promote] LANGFUSE_PROMPT_LABEL=production x-request-id=req-0001a003 -> correlation_id=req-0001a003 tokens_in=32
+
+$ python scripts/manage_prompt.py promote --version 2
+Gắn label 'production' cho v2 (Langfuse tự gỡ label này khỏi version cũ)
+Prompt 'day13-chat':
+  v1: labels=[baseline]  last line: 'Question={{message}}'
+  v2: labels=[candidate, latest, production]  last line: 'Answer in at most 3 short bullet points, using only the docs above.'
+[4. production sau khi promote v2] LANGFUSE_PROMPT_LABEL=production x-request-id=req-0001d004 -> correlation_id=req-0001d004 tokens_in=49
+
+$ python scripts/manage_prompt.py promote --version 1   # rollback
+Gắn label 'production' cho v1 (Langfuse tự gỡ label này khỏi version cũ)
+Prompt 'day13-chat':
+  v1: labels=[baseline, production]  last line: 'Question={{message}}'
+  v2: labels=[candidate, latest]  last line: 'Answer in at most 3 short bullet points, using only the docs above.'
+[5. production sau khi rollback v1] LANGFUSE_PROMPT_LABEL=production x-request-id=req-0001e005 -> correlation_id=req-0001e005 tokens_in=32
+
+# Trace tương ứng trên Langfuse (tra theo metadata.correlation_id qua API v2 observations)
+[1] req-0001b001 -> trace db3aa40443dc125e339d8778000e26a6  label=baseline   version=1
+[2] req-0001c002 -> trace 886c8be6274dca5c70c7193da247e3ea  label=candidate  version=2
+[3] req-0001a003 -> trace dede46ae82f45aa456a6acad8ff30bf7  label=production version=1  (trước promote)
+[4] req-0001d004 -> trace 5d089acb2aa4dc80111e00925ba0d861  label=production version=2  (sau promote)
+[5] req-0001e005 -> trace 95c3af2ddd02b5a86e1ae9f08d94dc77  label=production version=1  (sau rollback)
+Mỗi trace: AGENT lab-agent-run -> RETRIEVER retrieve + GENERATION llm-generate (model claude-sonnet-4-5, usage, cost, prompt day13-chat vN).

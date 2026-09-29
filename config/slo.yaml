@@ -3,11 +3,34 @@ primary_slo:
   name: fast_successful_requests
   window: 28d
   sli:
-    good_event: 'event == "response_sent" and latency_ms <= 3000'
+    # Một request "tốt" khi trả lời thành công trong 2 giây; request_failed và request
+    # chậm hơn 2 giây đều tiêu error budget (mẫu số là mọi request_received).
+    good_event: 'event == "response_sent" and latency_ms <= 2000'
+    latency_threshold_ms: 2000
     total_event: 'event == "request_received"'
   target_percent: 99.5
   error_budget_percent: 0.5
-  note: Học viên phải giải thích hoặc điều chỉnh ngưỡng bằng baseline của mình.
+  rationale: >-
+    Điều chỉnh từ 3000 ms xuống 2000 ms theo baseline đo ngày 2026-09-29. Khi prompt đã cache,
+    P50 ≈ 152 ms và P95 ≈ 153 ms (load test concurrency 5). Request đầu tiên sau mỗi lần cache
+    prompt hết hạn (TTL 60 s) phải gọi Langfuse Cloud, mất 1.2–1.9 s. Chạy thử incident rag_slow
+    trên server tách riêng cho latency ≈ 2653 ms, tức ngưỡng 3000 ms cũ không bắt được sự cố
+    retrieval chậm. 2000 ms nằm trên cold prompt fetch và dưới rag_slow. Threshold P95 3000 ms
+    của dashboard là contract nên giữ nguyên; dashboard vẽ thêm đường SLO 2000 ms. Target 99.5%
+    thay vì 99.9% vì dịch vụ phụ thuộc Langfuse Cloud và vector store bên ngoài.
+  error_budget:
+    formula: 'allowed_bad_events = (1 - target_percent / 100) * total_events'
+    example: >-
+      Với 10,000 request trong 28 ngày: 0.5% × 10,000 = 50 request được phép chậm hoặc lỗi.
+      Tương đương 50 / 28 ≈ 1.8 request xấu mỗi ngày nếu tiêu đều.
+    burn_rate: >-
+      burn_rate = tỷ lệ request xấu hiện tại / 0.5%. Burn rate 1 tiêu hết budget đúng 28 ngày;
+      error rate 2% (guardrail) là burn rate 4, hết budget sau 7 ngày; 7.2% là burn rate 14.4,
+      hết 2% budget chỉ trong 1 giờ, nên phải page ngay.
+    policy: >-
+      Còn budget: được deploy/đổi prompt bình thường. Dùng quá 50% budget: đổi prompt/model phải
+      qua label candidate trước. Hết budget: dừng thay đổi, rollback label production về version
+      ổn định gần nhất và chỉ làm việc tăng độ tin cậy.
 guardrails:
   error_rate_pct_max: 2
   daily_cost_usd_max: 2.5

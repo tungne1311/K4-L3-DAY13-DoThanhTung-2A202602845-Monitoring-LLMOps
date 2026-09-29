@@ -1,0 +1,42 @@
+# CP2 — trace list và cấu trúc span (Langfuse project id cmumdhy8720jiad0c945kvqcu), 2026-09-29
+# Tra qua API v2 observations; correlation_id lấy từ trace metadata, trùng với log data/logs.jsonl
+
+Traces có đủ root + retrieve + generation: 36
+
+start (UTC)          trace_id                           correlation_id label/version  observations
+2026-09-29 08:33:41  4cf13fa02ee31d79c18f81dfe08f1401  req-0000a003   production/v1      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:36:29  db3aa40443dc125e339d8778000e26a6  req-0001b001   baseline/v1      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:36:51  886c8be6274dca5c70c7193da247e3ea  req-0001c002   candidate/v2      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:37:12  dede46ae82f45aa456a6acad8ff30bf7  req-0001a003   production/v1      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:37:37  5d089acb2aa4dc80111e00925ba0d861  req-0001d004   production/v2      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:37:57  95c3af2ddd02b5a86e1ae9f08d94dc77  req-0001e005   production/v1      lab-agent-run, llm-generate, retrieve
+2026-09-29 08:39:01  0e8f2c83116966ec582fd7a69e33a82f  req-12baf0b9   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:03  6ea28b95250f1c15c1d30fbbe094809e  req-a25aae7a   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:03  5f8b03be65ffbb09d3bfa77896501bcc  req-25a6aa84   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:03  5e5400b529510187c1578aa2feaa4603  req-8aa2db51   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:03  4e25d24f343d2aca1ff703c855839890  req-d947239c   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:04  6f6d1691eec88198fac5422741bb43b2  req-0914a318   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:04  534de011c4c237a95569eafe8c293c59  req-823fbf91   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:04  b614efa6f8952c659c1d3b750a11a64d  req-cb178bae   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:04  e871dcfb60cd44efde3f8ba7a9a01151  req-c5412566   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:04  059d98554e980ae3111a33765e40b1ee  req-5a33fe11   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  b2a520671982b691b1995a1dd71b0489  req-8f3f0569   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  8d41ed871d6e36f1bf31e2398401c381  req-7ddca24d   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  1f39e50ed066fef5ab90789e47c06b85  req-eb71660f   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  751abe48e4f51df8f103bc58c5f35162  req-c86d6dd9   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  56c3ddb480975bbaafda9da7431a3e1a  req-18e16a3e   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:05  bb34e459b463e1e4ab92e514d6168051  req-962d6272   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:06  e53b713a9a90d5686026e6a4965713e6  req-4c087721   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:06  a89ffaee60109592d6f5a7ab9f71a3bb  req-898c4f7a   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:06  22adcc30de1ea824536889b8602abc94  req-0fb05ea6   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:06  2e6089b30c356ed0372ac4054cafd4e3  req-360f4a5f   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  77fa794ee28667c4774deae4910e55ee  req-91aa7f56   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  5cc43659ca9c2e930d62c98263bae569  req-60ffa0e4   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  f11d284cbc6eda16956f86e11bb97fb2  req-0458df65   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  be4616b0c40029a6fd65a50262cc0e5f  req-d67c8c4f   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  2b0ed711ac5e6d4c0357ad1ca9226ffa  req-6eea1cc8   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  9fed75c0eb0d1cfbd40ecca69a50505d  req-4e0eee77   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:07  4edcbce92dc60918be86d49961ea1b3c  req-3125c3db   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:08  ad5e05569c4765ccf07f7074cba3b12d  req-ed4ff3df   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:08  73514b063a81d1f2d21672f34c05ec6b  req-3eda3a3b   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
+2026-09-29 08:39:08  e9e69bc8058f47be5b3bdee81b13b1e6  req-29eec5a7   production/v1      lab-agent-run, llm-generate, resolve-prompt, retrieve
